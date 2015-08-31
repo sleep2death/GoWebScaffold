@@ -20,30 +20,31 @@ module.exports = function(grunt) {
         shell: 'grunt-shell-spawn'
     });
 
-    function mongodStartCallback(err, stdout, stderr, cb) {
-        if (stderr.length > 0) {
-            grunt.log.writeln("WARNING: Mongod is ALREADY running.".yellow.bold);
-        } else {
-            grunt.log.writeln("DONE: Mongod has started.".green.bold);
-        }
-        cb();
-    }
-
-    function mongodStopCallback(err, stdout, stderr, cb) {
-        if (stderr.length > 0) {
-            grunt.log.writeln("WARNING: Mongod is NOT running.".yellow.bold);
-        } else {
-            grunt.log.writeln("DONE: Mongod has stopped.".green.bold);
-        }
-        cb();
-    }
-
     // Configurable paths for the application
     var appConfig = {
         app: require('./bower.json').appPath || 'app',
-        dist: 'dist'
+        dist: 'dist',
     };
 
+    function getMongoPID(err, stdout, stderr, cb) {
+        if (stdout === "") {
+            grunt.initConfig.mongoPID = -1;
+        } else {
+            grunt.initConfig.mongoPID = parseInt(stdout);
+        }
+
+        cb();
+    }
+
+    function getServerPID(err, stdout, stderr, cb) {
+        if (stdout === "") {
+            grunt.initConfig.serverPID = -1;
+        } else {
+            grunt.initConfig.serverPID = parseInt(stdout);
+        }
+
+        cb();
+    }
 
     // Define the configuration for all the tasks
     grunt.initConfig({
@@ -51,26 +52,78 @@ module.exports = function(grunt) {
         // Project settings
         yeoman: appConfig,
 
+        mongoPort: 27017,
+        mongoPID: -1,
+
+        serverPort: 8080,
+        serverPID: -1,
+
         dbpath: '/Users/aspirin/Workspace/mongodb/db',
         logpath: '/Users/aspirin/Workspace/mongodb/log/mlog.log',
 
-        //start/stop mongodb
+        serverEntry: 'server/serve/serve.go',
+
         shell: {
-            mongodStart: {
-                command: 'mongod --dbpath <%= dbpath %> --logpath <%= logpath %> --fork --auth --port 27017',
+            isMongoRunning: {
+                command: "lsof -i :<%= mongoPort %> | grep LISTEN | awk '{print $2}'",
                 options: {
-                    callback: mongodStartCallback
+                    callback: getMongoPID
                 }
             },
-            mongodStop: {
-                command: 'kill $(pgrep mongod | awk "{print $1}")',
+            startMongo: {
+                command: function() {
+                    if (grunt.initConfig.mongoPID < 0) {
+                        grunt.log.warn("starting mongod...".green.bold);
+                        return "mongod --dbpath <%= dbpath %> --logpath <%= logpath %> --port <%= mongoPort %> --logappend --fork --auth";
+                    } else {
+                        grunt.log.warn("mongod is ALREADY running...".yellow.bold);
+                        return "";
+                    }
+                },
+            },
+            stopMongo: {
+                command: function() {
+                    if (grunt.initConfig.mongoPID > 0) {
+                        grunt.log.warn("killing mongod ...".green.bold);
+                        return "kill " + grunt.initConfig.mongoPID;
+                    } else {
+                        grunt.log.warn("mongod is NOT running...".yellow.bold);
+                        return "";
+                    }
+                },
+            },
+
+            isServerRunning: {
+                command: "lsof -i :<%= serverPort %> | grep LISTEN | awk '{print $2}'",
                 options: {
-                    callback: mongodStopCallback
+                    callback: getServerPID
                 }
+            },
+            startServer: {
+                command: function() {
+                    if (grunt.initConfig.serverPID < 0) {
+                        grunt.log.warn("starting server...".green.bold);
+                        return "go run <%= serverEntry %>";
+                    } else {
+                        grunt.log.warn("server is ALREADY running...".yellow.bold);
+                        return "";
+                    }
+                },
+            },
+            stopServer: {
+                command: function() {
+                    if (grunt.initConfig.serverPID > 0) {
+                        grunt.log.warn("killing server ...".green.bold);
+                        return "kill " + grunt.initConfig.serverPID;
+                    } else {
+                        grunt.log.warn("server is NOT running...".yellow.bold);
+                        return "";
+                    }
+                },
             },
             options: {
-                stdout: false,
-                stderr: false,
+                stdout: true,
+                stderr: true,
                 failOnError: true,
             }
         },
@@ -438,6 +491,15 @@ module.exports = function(grunt) {
             test: [
                 'copy:styles'
             ],
+            connect: {
+                tasks:[
+                    'watch',
+                    'serverStart',
+                ],
+                options: {
+                    logConcurrentOutput: true
+                }
+            },
             dist: [
                 'copy:styles',
                 'imagemin',
@@ -466,8 +528,9 @@ module.exports = function(grunt) {
             'wiredep',
             'concurrent:server',
             'autoprefixer:server',
-            'connect:livereload',
-            'watch'
+            //'connect:livereload',
+            'mongoStart',
+            'concurrent:connect',
         ]);
     });
 
@@ -509,11 +572,23 @@ module.exports = function(grunt) {
         'build'
     ]);
 
-    grunt.registerTask('mongoS', [
-        'shell:mongodStart'
+    grunt.registerTask('mongoStart', [
+        'shell:isMongoRunning',
+        'shell:startMongo'
     ]);
 
-    grunt.registerTask('mongoE', [
-        'shell:mongodStop'
+    grunt.registerTask('mongoStop', [
+        'shell:isMongoRunning',
+        'shell:stopMongo'
+    ]);
+
+    grunt.registerTask('serverStart', [
+        'shell:isServerRunning',
+        'shell:startServer'
+    ]);
+
+    grunt.registerTask('serverStop', [
+        'shell:isServerRunning',
+        'shell:stopServer'
     ]);
 };

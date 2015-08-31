@@ -23,7 +23,11 @@ const (
 )
 
 func main() {
-	server.ConnectDB(DBname, DBusr, DBpwd, DBport)
+	err := server.ConnectDB(DBname, DBusr, DBpwd, DBport)
+
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
 
 	//set to release mode
 	//gin.SetMode(gin.ReleaseMode)
