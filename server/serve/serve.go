@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/sleep2death/civ/server"
+	"github.com/sleep2death/GoWebScaffold/server"
 	"log"
 	"net/http"
 )

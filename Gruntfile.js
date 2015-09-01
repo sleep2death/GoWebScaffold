@@ -327,6 +327,12 @@ module.exports = function(grunt) {
                         },
                         post: {}
                     }
+                },
+                blockReplacements: {
+                    rm: function() {
+                        console.log("remove!");
+                        return '';
+                    }
                 }
             }
         },
@@ -492,7 +498,7 @@ module.exports = function(grunt) {
                 'copy:styles'
             ],
             connect: {
-                tasks:[
+                tasks: [
                     'watch',
                     'serverStart',
                 ],
@@ -530,6 +536,7 @@ module.exports = function(grunt) {
             'autoprefixer:server',
             //'connect:livereload',
             'mongoStart',
+            'serverStop',
             'concurrent:connect',
         ]);
     });
